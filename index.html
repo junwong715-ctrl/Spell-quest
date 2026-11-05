@@ -1,0 +1,509 @@
+<title>Spell Quest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* Layout: one-screen RPG — a map trail and a battle screen swapped in place inside a 560px column; deliberately single dark "night quest" theme */
+:root{
+  --bg:#141a31; --bg2:#1d2747; --panel:#25305a; --line:#3a4778;
+  --ink:#f5f0e2; --muted:#aeb5d2; --gold:#f7c84b; --gold-dk:#b88a17;
+  --hp:#e5574a; --ok:#4cc781;
+  --paper:#fff8e8; --paper-ink:#1f1b2e; --key-shadow:#bcae8c;
+  --c1:#2f7de1; --c2:#e0464d; --c3:#22995c; --c4:#8a56d6; --c5:#e9811c; --c6:#11999a;
+  --f-display:'Press Start 2P', ui-monospace, monospace;
+  --f-body:'Andika', 'Nunito', system-ui, sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  background-color:var(--bg);
+  background-image:radial-gradient(circle at 15% 0%, #2b3a70 0, transparent 45%),
+                   radial-gradient(circle at 95% 100%, #3b2552 0, transparent 50%);
+  background-attachment:fixed;
+  color:var(--ink); font-family:var(--f-body); font-size:16px;
+}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:14px 28px;min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+/* ---------- MAP ---------- */
+.title{font-family:var(--f-display);color:var(--gold);font-size:clamp(20px,6vw,28px);text-align:center;margin:10px 0 0;letter-spacing:2px;text-shadow:0 4px 0 var(--gold-dk)}
+.sub{text-align:center;color:var(--muted);margin:0;font-size:15px}
+.mode{display:flex;justify-content:center;gap:0;margin:2px auto 0;background:var(--bg2);border:2px solid var(--line);border-radius:12px;padding:3px}
+.mode button{border:0;background:transparent;color:var(--muted);font-weight:700;font-size:15px;padding:8px 14px;border-radius:9px}
+.mode button[aria-pressed="true"]{background:var(--gold);color:var(--paper-ink)}
+.mode-note{text-align:center;color:var(--muted);font-size:13px;margin:-6px 0 0}
+.trail{position:relative;display:flex;flex-direction:column;gap:16px;padding-block:6px}
+.trail::before{content:"";position:absolute;left:50%;top:20px;bottom:20px;border-left:4px dashed var(--line);transform:translateX(-50%)}
+.node{position:relative;display:flex;align-items:center;gap:12px;width:80%;padding:10px 12px;border-radius:16px;background:var(--panel);border:2px solid var(--line);color:var(--ink);text-align:left}
+.node:nth-child(even){align-self:flex-end}
+.node:hover:not(:disabled){border-color:var(--gold)}
+.node:disabled{opacity:.45;cursor:not-allowed}
+.node svg{width:58px;height:58px;flex:none}
+.node .info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.node .lv{font-family:var(--f-display);font-size:9px;color:var(--gold)}
+.node .nm{font-weight:700;font-size:17px}
+.node .zh{color:var(--muted);font-size:14px}
+.stars{color:#5b6592;font-size:18px;letter-spacing:2px}
+.stars .on{color:var(--gold)}
+.foot{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:13px;text-align:center}
+.link{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px}
+
+/* ---------- BATTLE ---------- */
+.bar{display:flex;align-items:center;gap:10px}
+.btn{border:0;border-radius:12px;padding:9px 14px;font-weight:700;font-size:15px;background:var(--panel);color:var(--ink);border:2px solid var(--line)}
+.bar .where{flex:1;min-width:0;font-family:var(--f-display);font-size:11px;color:var(--gold);line-height:1.5}
+.count{font-family:var(--f-display);font-size:11px;color:var(--ink);font-variant-numeric:tabular-nums}
+.arena{position:relative;display:flex;justify-content:space-between;align-items:flex-end;height:158px;padding:10px 14px 14px;border-radius:18px;border:2px solid var(--line);
+  background:linear-gradient(180deg,var(--bg2) 0%,var(--panel) 72%,#2f3b6a 72%,#2a3561 100%);overflow:hidden}
+.hero{width:86px;height:104px;transition:transform .18s}
+.hero.attack{transform:translateX(70px)}
+.foe{display:flex;flex-direction:column;align-items:center;gap:6px;width:130px}
+.foe svg{width:116px;height:116px}
+.hp{width:110px;height:12px;background:#0007;border-radius:7px;overflow:hidden;border:2px solid #0005}
+.hp i{display:block;height:100%;background:var(--hp);transition:width .45s}
+.foe.hit svg{animation:hit .45s}
+.foe.dead svg{animation:dead .9s forwards}
+@keyframes hit{0%,100%{transform:translateX(0);filter:none}25%{transform:translateX(10px);filter:brightness(2.2)}60%{transform:translateX(-6px)}}
+@keyframes dead{to{transform:translateY(30px) scale(.4);opacity:0}}
+.pow{position:absolute;right:56px;top:28px;font-family:var(--f-display);font-size:16px;color:var(--gold);opacity:0;pointer-events:none}
+.pow.show{animation:pow .8s}
+@keyframes pow{0%{opacity:0;transform:scale(.5)}30%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:translateY(-24px)}}
+
+.clue{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.play{display:flex;align-items:center;gap:8px;background:var(--gold);color:var(--paper-ink);border:0;border-radius:14px;padding:11px 18px;font-weight:700;font-size:18px;box-shadow:0 4px 0 var(--gold-dk)}
+.play:active{transform:translateY(3px);box-shadow:0 1px 0 var(--gold-dk)}
+.play svg{width:18px;height:18px}
+.speed{display:flex;align-items:center;gap:10px;background:var(--bg2);border:2px solid var(--line);border-radius:14px;padding:8px 14px;font-weight:700;font-size:16px}
+.speed input{width:clamp(110px,34vw,170px);accent-color:var(--gold)}
+.voice{display:flex;align-items:center;gap:10px;background:var(--bg2);border:2px solid var(--line);border-radius:14px;padding:8px 12px;font-weight:700;font-size:16px;color:var(--ink);max-width:100%;box-sizing:border-box}
+.voice select{min-width:0;max-width:62vw;font:600 15px var(--f-body);background:var(--panel);color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:6px 8px}
+.speed output{font-variant-numeric:tabular-nums;min-width:3.2em;color:var(--gold)}
+.meaning{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--bg2);border:2px solid var(--line);border-radius:18px;padding:10px 16px}
+.m-row{display:flex;align-items:baseline;gap:14px}
+.tag{font-size:14px;color:var(--muted);min-width:3.6em;text-align:right}
+.zh-t,.ja-t{font-size:clamp(32px,9vw,44px);font-weight:700;line-height:1.55}
+.zh-t{color:var(--gold);font-family:"PingFang SC","Noto Sans SC","Microsoft YaHei","Heiti SC",sans-serif}
+.ja-t{color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif}
+.ja-t rt{font-size:.42em;font-weight:400;color:var(--muted)}
+.zh-t ruby{margin-inline:.06em}
+.zh-t rt{font-size:.4em;font-weight:700;font-family:var(--f-body);color:var(--ink);letter-spacing:0}
+.parts{font-size:14px;color:var(--muted)}
+.m-row{align-items:center}
+.say{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:50%;border:2px solid var(--line);background:var(--panel);color:var(--gold);padding:0}
+.say svg{width:22px;height:22px}
+.say:active{transform:scale(.92)}
+.wordwrap{position:relative}
+#typer{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:0;padding:0;font-size:16px;caret-color:transparent;cursor:text}
+.wordwrap:focus-within .syl{box-shadow:0 0 0 3px #f7c84b55}
+.tap{text-align:center;color:var(--muted);font-size:14px;margin-top:-6px}
+
+.word{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;min-height:70px;align-content:center}
+.syl{--c:var(--c1);display:flex;gap:3px;padding:7px 8px;border-radius:14px;background:color-mix(in srgb,var(--c) 24%,var(--paper));border:3px solid var(--c)}
+.slot{width:clamp(25px,7.4vw,36px);height:48px;display:grid;place-items:center;font:700 clamp(26px,7.6vw,34px)/1 var(--f-body);
+  color:color-mix(in srgb,var(--c) 78%,#000);border-bottom:3px solid color-mix(in srgb,var(--c) 50%,transparent);box-sizing:border-box}
+.slot.ghost{color:color-mix(in srgb,var(--c) 32%,transparent)}
+.slot.cur{background:#ffffffa8;border-radius:6px;border-bottom-color:var(--c);animation:blink 1s infinite}
+.slot.bad{animation:shake .35s;background:#ffd3cf}
+@keyframes blink{50%{border-bottom-color:transparent}}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.msg{text-align:center;min-height:24px;font-weight:700;font-size:18px;color:var(--ok)}
+.msg.warn{color:#ffb4a8}
+
+.kb{display:flex;flex-direction:column;gap:7px;margin-top:auto}
+.row{display:flex;gap:5px;justify-content:center}
+.key{flex:1 1 0;max-width:48px;min-width:0;height:50px;padding:0;border:0;border-radius:9px;background:var(--paper);color:var(--paper-ink);font:700 22px var(--f-body);box-shadow:0 4px 0 var(--key-shadow)}
+.key:active{transform:translateY(3px);box-shadow:0 1px 0 var(--key-shadow)}
+.key.bad{background:#ffc7c0}
+.key.good{background:#c9f2d8}
+
+/* ---------- OVERLAY ---------- */
+.overlay{position:fixed;inset:0;background:#05081acc;display:grid;place-items:center;padding:16px;z-index:5}
+.modal{background:var(--panel);border:3px solid var(--gold);border-radius:20px;padding:22px 20px;max-width:360px;width:100%;box-sizing:border-box;text-align:center;display:flex;flex-direction:column;gap:12px}
+.modal h2{font-family:var(--f-display);color:var(--gold);font-size:16px;margin:0;line-height:1.6;text-wrap:balance}
+.modal p{margin:0;color:var(--muted)}
+.big-stars{font-size:44px;letter-spacing:6px;color:#5b6592}
+.big-stars .on{color:var(--gold)}
+.modal .row{gap:10px}
+.modal .btn{flex:1}
+.modal .primary{background:var(--gold);color:var(--paper-ink);border-color:var(--gold)}
+.learned{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.learned span{background:var(--bg2);border-radius:8px;padding:3px 8px;font-size:15px}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap" id="app"></div>
+<div class="overlay" id="overlay" hidden><div class="modal" id="modal"></div></div>
+
+<script>
+/* ---------- WORD BANK (Primary 2 / Cambridge Starters–Movers style, British spelling — swapped set) ----------
+   format  syl|la|ble:中文  */
+/* format  syl|la|ble:简体中文:日本語  ([漢字|よみ] = ruby over kanji only) */
+const RAW = {
+  forest: "bear:熊:[熊|くま],fox:狐狸:きつね,bird:鸟:[鳥|とり],fish:鱼:[魚|さかな],cat:猫:[猫|ねこ],dog:狗:[犬|いぬ],pig:猪:[豚|ぶた],cow:牛:[牛|うし],bee:蜜蜂:みつばち,ant:蚂蚁:あり,but|ter|fly:蝴蝶:ちょう,dol|phin:海豚:イルカ,whale:鲸鱼:くじら,pan|da:熊猫:パンダ,kan|ga|roo:袋鼠:カンガルー,owl:猫头鹰:ふくろう,wolf:狼:[狼|おおかみ],cam|el:骆驼:らくだ,pen|guin:企鹅:ペンギン,seal:海豹:あざらし",
+  fruit:  "straw|ber|ry:草莓:いちご,peach:桃子:[桃|もも],cher|ry:樱桃:さくらんぼ,mel|on:蜜瓜:メロン,corn:玉米:とうもろこし,cheese:奶酪:チーズ,piz|za:比萨:ピザ,sand|wich:三明治:サンドイッチ,noo|dles:面条:[麺|めん],soup:汤:[スープ],meat:肉:[肉|にく],sal|ad:沙拉:サラダ,bis|cuit:饼干:ビスケット,sweet:糖果:あめ,ice|cream:冰淇淋:アイス,yo|ghurt:酸奶:ヨーグルト,pea|nut:花生:ピーナッツ,bean:豆子:[豆|まめ],pea:豌豆:えんどう,chips:薯条:チップス",
+  school: "friend:朋友:[友達|ともだち],pu|pil:学生:[生徒|せいと],school:学校:[学校|がっこう],Eng|lish:英语:[英語|えいご],Chi|nese:中文:[中国語|ちゅうごくご],Maths:数学:[算数|さんすう],mu|sic:音乐:[音楽|おんがく],sport:运动:[運動|うんどう],play|ground:操场:[遊|あそ]び[場|ば],li|brar|y:图书馆:[図書館|としょかん],home|work:功课:[宿題|しゅくだい],test:测验:テスト,an|swer:答案:[答|こた]え,ques|tion:问题:[質問|しつもん],page:页:ページ,sto|ry:故事:[物語|ものがたり],let|ter:字母／信:[文字|もじ],num|ber:数字:[数字|すうじ],col|our:颜色:[色|いろ],draw:画画:[描|か]く",
+  home:   "town:城镇:[町|まち],street:街道:[道|みち],shop:商店:[店|みせ],park:公园:[公園|こうえん],bus:巴士:バス,car:汽车:[車|くるま],bike:自行车:じてんしゃ,train:火车:[電車|でんしゃ],plane:飞机:[飛行機|ひこうき],boat:船:[船|ふね],ball:球:ボール,toy:玩具:おもちゃ,doll:玩偶:[人形|にんぎょう],game:游戏:ゲーム,phone:电话:[電話|でんわ],wa|ter:水:[水|みず],fire:火:[火|ひ],rain:雨:[雨|あめ],sun:太阳:[太陽|たいよう],wind:风:[風|かぜ]",
+  body:   "knee:膝盖:[膝|ひざ],fin|ger:手指:[指|ゆび],toe:脚趾:[足|あし]の[指|ゆび],eye:眼睛:[目|め],tooth:牙齿:[歯|は],neck:脖子:[首|くび],back:背:[背中|せなか],shoul|der:肩膀:[肩|かた],coat:大衣:コート,jeans:牛仔裤:ジーンズ,shorts:短裤:ハーフパンツ,gloves:手套:[手袋|てぶくろ],scarf:围巾:マフラー,um|brel|la:雨伞:[傘|かさ],watch:手表:[腕時計|うでどけい],ring:戒指:[指輪|ゆびわ],but|ton:纽扣:ボタン,pock|et:口袋:ポケット,boot:靴子:ブーツ"
+};
+const PY_RAW = "熊=xióng;狐狸=hú li;鸟=niǎo;鱼=yú;猫=māo;狗=gǒu;猪=zhū;牛=niú;蜜蜂=mì fēng;蚂蚁=mǎ yǐ;蝴蝶=hú dié;海豚=hǎi tún;鲸鱼=jīng yú;熊猫=xióng māo;袋鼠=dài shǔ;猫头鹰=māo tóu yīng;狼=láng;骆驼=luò tuo;企鹅=qǐ é;海豹=hǎi bào;" +
+  "草莓=cǎo méi;桃子=táo zi;樱桃=yīng táo;蜜瓜=mì guā;玉米=yù mǐ;奶酪=nǎi lào;比萨=bǐ sà;三明治=sān míng zhì;面条=miàn tiáo;汤=tāng;肉=ròu;沙拉=shā lā;饼干=bǐng gān;糖果=táng guǒ;冰淇淋=bīng qí lín;酸奶=suān nǎi;花生=huā shēng;豆子=dòu zi;豌豆=wān dòu;薯条=shǔ tiáo;" +
+  "朋友=péng you;学生=xué shēng;学校=xué xiào;英语=yīng yǔ;中文=zhōng wén;数学=shù xué;音乐=yīn yuè;运动=yùn dòng;操场=cāo chǎng;图书馆=tú shū guǎn;功课=gōng kè;测验=cè yàn;答案=dá àn;问题=wèn tí;页=yè;故事=gù shi;字母／信=zì mǔ / xìn;数字=shù zì;颜色=yán sè;画画=huà huà;" +
+  "城镇=chéng zhèn;街道=jiē dào;商店=shāng diàn;公园=gōng yuán;巴士=bā shì;汽车=qì chē;自行车=zì xíng chē;火车=huǒ chē;飞机=fēi jī;船=chuán;球=qiú;玩具=wán jù;玩偶=wán ǒu;游戏=yóu xì;电话=diàn huà;水=shuǐ;火=huǒ;雨=yǔ;太阳=tài yáng;风=fēng;" +
+  "膝盖=xī gài;手指=shǒu zhǐ;脚趾=jiǎo zhǐ;眼睛=yǎn jing;牙齿=yá chǐ;脖子=bó zi;背=bèi;肩膀=jiān bǎng;大衣=dà yī;牛仔裤=niú zǎi kù;短裤=duǎn kù;手套=shǒu tào;围巾=wéi jīn;雨伞=yǔ sǎn;手表=shǒu biǎo;戒指=jiè zhi;纽扣=niǔ kòu;口袋=kǒu dài;靴子=xuē zi";
+const PINYIN = {}; PY_RAW.split(";").forEach(p => { const [k, v] = p.split("="); PINYIN[k] = v.split(" "); });
+function zhRuby(zh){
+  const py = PINYIN[zh]; if (!py) return zh;
+  let j = 0;
+  return [...zh].map(ch => { const t = py[j++]; return ch === "／" ? "／" : `<ruby>${ch}<rt>${t}</rt></ruby>`; }).join("");
+}
+const ruby = s =>s.replace(/\[([^|\]]+)\|([^\]]+)\]/g, "<ruby>$1<rt>$2</rt></ruby>");
+const parse = s => s.split(",").map(t => { const [w, zh, ja] = t.split(":"); const syl = w.split("|"); return { syl, word: syl.join(""), zh, ja }; });
+const BANK = {}; for (const k in RAW) BANK[k] = parse(RAW[k]);
+const ALL = Object.values(BANK).flat();
+
+const STAGES = [
+  { key:"forest", name:"Animal Forest", zh:"动物森林", acc:"leaf",   color:"#63c46f", count:6 },
+  { key:"fruit",  name:"Fruit Valley",  zh:"水果山谷", acc:"stem",   color:"#f0903f", count:6 },
+  { key:"school", name:"School Tower",  zh:"学校高塔", acc:"glasses",color:"#6ea9f2", count:6 },
+  { key:"home",   name:"Home Village",  zh:"温暖小村", acc:"bow",    color:"#f27fb0", count:6 },
+  { key:"body",   name:"Troll Bridge",  zh:"巨魔桥",   acc:"horns",  color:"#9c7cda", count:6 },
+  { key:"boss",   name:"Dragon Castle", zh:"恶龙城堡", acc:"dragon", color:"#e0544a", count:8 }
+];
+const SYL_COLORS = ["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(--c6)"];
+
+/* ---------- SAVE ---------- */
+const SAVE_KEY = "spellquest.v2";
+let save = { unlocked:1, stars:{}, rate:0.75 };
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch(e){}
+const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e){} };
+
+/* ---------- SPEECH (British English) ---------- */
+let gbVoice = null, voiceNote = "", enVoices = [];
+const hasTTS = "speechSynthesis" in window;
+const REGION = { GB:"UK", US:"US", AU:"Australia", IE:"Ireland", IN:"India", ZA:"South Africa", NZ:"New Zealand", CA:"Canada", SG:"Singapore", HK:"Hong Kong", PH:"Philippines" };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+function voiceLabel(v){
+  const r = (v.lang.split(/[-_]/)[1] || "").toUpperCase();
+  return (REGION[r] ? REGION[r] + " · " : "") + v.name;
+}
+function fillVoiceSelects(){
+  document.querySelectorAll(".voice-sel").forEach(sel => {
+    if (!enVoices.length){ sel.innerHTML = '<option>No English voice found</option>'; sel.disabled = true; return; }
+    sel.disabled = false;
+    sel.innerHTML = enVoices.map((v, i) => `<option value="${i}">${esc(voiceLabel(v))}</option>`).join("");
+    sel.value = String(Math.max(0, enVoices.indexOf(gbVoice)));
+  });
+}
+function bindVoiceSelect(sel){
+  sel.onchange = () => {
+    gbVoice = enVoices[+sel.value] || gbVoice;
+    save.voiceName = gbVoice ? gbVoice.name : ""; persist();
+    const n = document.getElementById("voiceNote"); if (n && gbVoice) n.textContent = "";
+    speak(screen === "battle" && G ? G.cur.word : "Hello! Let's spell.");
+  };
+}
+function loadVoices(){
+  if (!hasTTS) { voiceNote = "This browser cannot speak words aloud."; return; }
+  const vs = speechSynthesis.getVoices();
+  const gb = vs.filter(v => /en[-_]GB/i.test(v.lang));
+  const pref = ["Google UK English Female","Google UK English Male","Serena","Kate","Martha","Daniel","Arthur","Libby","Sonia"];
+  // every English voice, British first
+  enVoices = vs.filter(v => /^en/i.test(v.lang))
+    .sort((a, b) => (/GB/i.test(b.lang) - /GB/i.test(a.lang)) || a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
+  gbVoice = enVoices.find(v => v.name === save.voiceName)
+    || gb.find(v => pref.some(p => v.name.includes(p))) || gb[0] || enVoices[0] || null;
+  fillVoiceSelects();
+  voiceNote = (vs.length && !gb.length) ? "No British voice found on this device. Add an English (UK) voice in system settings." : "";
+  const el = document.getElementById("voiceNote"); if (el) el.textContent = voiceNote;
+}
+if (hasTTS) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+function pickVoice(prefixes){
+  const vs = speechSynthesis.getVoices();
+  for (const p of prefixes){ const v = vs.find(v => v.lang.replace("_","-").toLowerCase().startsWith(p)); if (v) return v; }
+  return null;
+}
+function speakLang(text, lang){
+  if (!hasTTS) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang;
+  let v;
+  if (lang === "ja-JP") v = pickVoice(["ja"]);
+  else {
+    const vs = speechSynthesis.getVoices();
+    v = vs.find(x => /google/i.test(x.name) && /zh[-_]CN/i.test(x.lang))       // Google 普通话（中国大陆）
+     || vs.find(x => /google/i.test(x.name) && /普通话|mandarin/i.test(x.name))
+     || pickVoice(["zh-cn","zh-hans","cmn","zh-tw"]);
+  }
+  if (v) u.voice = v;
+  u.rate = Math.min(1, save.rate + 0.1);
+  speechSynthesis.speak(u);
+}
+function speak(text, rate){
+  if (!hasTTS) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "en-GB"; if (gbVoice) u.voice = gbVoice;
+  u.rate = rate || save.rate; u.pitch = 1.05;
+  speechSynthesis.speak(u);
+}
+
+/* ---------- SOUND FX ---------- */
+let ac = null;
+function tone(f, d, type, vol, when){
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const t = ac.currentTime + (when||0), o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "square"; o.frequency.value = f;
+    g.gain.setValueAtTime(vol || .05, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d + .02);
+  } catch(e){}
+}
+const sfx = {
+  ok:  () => tone(880,.07,"square",.04),
+  bad: () => tone(150,.2,"sawtooth",.05),
+  hit: () => { tone(330,.08,"square",.05); tone(520,.1,"square",.05,.08); },
+  win: () => [523,659,784,1047].forEach((f,i)=>tone(f,.18,"square",.05,i*.13))
+};
+
+/* ---------- ART ---------- */
+function monsterSVG(st){
+  const c = st.color; let behind = "", top = "", over = "", mouth = '<path d="M48 84 Q60 93 72 84" stroke="#2a1a2a" stroke-width="4" fill="none" stroke-linecap="round"/>';
+  switch (st.acc){
+    case "leaf": top = '<path d="M60 33 C58 17 72 8 88 11 C83 25 72 32 60 33Z" fill="#3a9748"/><path d="M60 34 L64 22" stroke="#24602e" stroke-width="3"/>'; break;
+    case "stem": top = '<rect x="57" y="15" width="7" height="20" rx="3" fill="#6b4a2b"/><path d="M64 22 C72 11 86 13 88 20 C78 27 69 27 64 22Z" fill="#4caf50"/>'; break;
+    case "glasses": over = '<g fill="none" stroke="#1e2a44" stroke-width="3.5"><circle cx="45" cy="64" r="12"/><circle cx="75" cy="64" r="12"/><path d="M57 63 h6"/></g>'; break;
+    case "bow": top = '<path d="M60 33 L40 21 L42 44Z M60 33 L80 21 L78 44Z" fill="#ffd166" stroke="#0003" stroke-width="2"/><circle cx="60" cy="33" r="6" fill="#f2a72b"/>'; break;
+    case "horns": top = '<path d="M30 48 L18 16 L46 38Z M90 48 L102 16 L74 38Z" fill="#f1e8d0" stroke="#0004" stroke-width="2"/>'; mouth = '<path d="M46 84 Q60 78 74 84" stroke="#2a1a2a" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M50 83 l3 -7 l3 6Z M64 82 l3 -6 l3 7Z" fill="#fff"/>'; break;
+    case "dragon":
+      behind = '<path d="M24 70 L0 26 L20 38 L16 14 L40 50Z M96 70 L120 26 L100 38 L104 14 L80 50Z" fill="#9e2f29" stroke="#0004" stroke-width="2"/>';
+      top = '<path d="M36 44 L30 14 L50 36Z M84 44 L90 14 L70 36Z" fill="#f6d27a"/>';
+      mouth = '<path d="M42 82 Q60 96 78 82Z" fill="#3a1010"/><path d="M47 83 l3 6 l3 -5Z M67 84 l3 5 l3 -6Z" fill="#fff"/>'; break;
+  }
+  const body = `<path d="M14 102 Q12 36 60 30 Q108 36 106 102 Q96 110 84 102 Q72 110 60 102 Q48 110 36 102 Q25 110 14 102Z" fill="${c}" stroke="#0004" stroke-width="3"/>
+    <ellipse cx="38" cy="48" rx="10" ry="6" fill="#fff" opacity=".35"/>`;
+  const eyes = `<circle cx="45" cy="64" r="9" fill="#fff"/><circle cx="75" cy="64" r="9" fill="#fff"/>
+    <circle cx="47" cy="66" r="4.5" fill="#1b1b2b"/><circle cx="73" cy="66" r="4.5" fill="#1b1b2b"/>`;
+  return `<svg viewBox="0 0 120 120" aria-hidden="true">${behind}${body}${top}${eyes}${over}${mouth}</svg>`;
+}
+const HERO = `<svg class="hero" id="hero" viewBox="0 0 100 120" aria-hidden="true">
+  <rect x="36" y="98" width="10" height="18" rx="3" fill="#2b3a66"/><rect x="54" y="98" width="10" height="18" rx="3" fill="#2b3a66"/>
+  <rect x="30" y="58" width="40" height="44" rx="11" fill="#3e72d8"/>
+  <path d="M30 70 h40" stroke="#f7c84b" stroke-width="4"/>
+  <circle cx="50" cy="40" r="21" fill="#f2c9a0"/>
+  <path d="M27 40 Q27 10 50 10 Q73 10 73 40 L73 32 L27 32Z" fill="#cdd3df" stroke="#8b93a8" stroke-width="2"/>
+  <path d="M50 6 Q58 0 62 8" stroke="#e0464d" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <circle cx="43" cy="44" r="3" fill="#1b1b2b"/><circle cx="57" cy="44" r="3" fill="#1b1b2b"/>
+  <path d="M45 52 Q50 56 55 52" stroke="#8a4b32" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <g transform="rotate(28 82 74)"><rect x="79" y="30" width="6" height="46" rx="2" fill="#e6ecf6" stroke="#8b93a8"/><rect x="72" y="74" width="20" height="6" rx="3" fill="#b88a17"/><rect x="79" y="80" width="6" height="12" rx="2" fill="#6b4a2b"/></g>
+  <circle cx="26" cy="80" r="15" fill="#f7c84b" stroke="#b88a17" stroke-width="3"/><path d="M26 70 v20 M16 80 h20" stroke="#b88a17" stroke-width="3"/>
+</svg>`;
+const SPEAKER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4Z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+const PLAY_ICON ='<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3 L17 10 L5 17Z" fill="currentColor"/></svg>';
+const starRow = (n, cls) => `<span class="${cls}">${[1,2,3].map(i=>`<span class="${i<=n?"on":""}">★</span>`).join("")}</span>`;
+
+/* ---------- STATE ---------- */
+const app = document.getElementById("app");
+const overlay = document.getElementById("overlay"), modal = document.getElementById("modal");
+let screen = "map";
+let G = null; // battle state
+
+const shuffle = a => { a = a.slice(); for (let i = a.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; };
+
+/* ---------- MAP ---------- */
+function showMap(){
+  screen = "map"; overlay.hidden = true;
+  app.innerHTML = `
+    <h1 class="title">SPELL QUEST</h1>
+    <p class="sub">Cambridge Starters &amp; Movers words · Primary 2</p>
+    <p class="mode-note">Listen and spell. 听音默写</p>
+    <div class="trail">
+      ${STAGES.map((st,k)=>{
+        const locked = k >= save.unlocked;
+        return `<button class="node" data-k="${k}" ${locked?"disabled":""}>
+          ${monsterSVG(st)}
+          <span class="info">
+            <span class="lv">${k===STAGES.length-1 ? "BOSS" : "STAGE " + (k+1)}</span>
+            <span class="nm">${st.name}</span>
+            <span class="zh">${st.zh} · ${st.count} words</span>
+            ${locked ? '<span class="zh">Locked</span>' : starRow(save.stars[st.key]||0,"stars")}
+          </span>
+        </button>`;}).join("")}
+    </div>
+    <div class="foot">
+      <label class="voice" for="voiceSelMap">English voice <select id="voiceSelMap" class="voice-sel"></select></label>
+      <span id="voiceNote">${voiceNote}</span>
+      <span id="resetBox"><button class="link" id="reset">Reset progress</button></span>
+    </div>`;
+  app.querySelectorAll(".node").forEach(b => b.onclick = () => startStage(+b.dataset.k));
+  fillVoiceSelects(); bindVoiceSelect(document.getElementById("voiceSelMap"));
+  document.getElementById("reset").onclick = () => {
+    document.getElementById("resetBox").innerHTML = 'Clear all stars? <button class="link" id="rYes">Yes, reset</button> <button class="link" id="rNo">Cancel</button>';
+    document.getElementById("rYes").onclick = () => { save.unlocked=1; save.stars={}; persist(); showMap(); };
+    document.getElementById("rNo").onclick = showMap;
+  };
+}
+
+/* ---------- BATTLE ---------- */
+function startStage(k){
+  const st = STAGES[k];
+  const pool = st.key === "boss" ? ALL : BANK[st.key];
+  G = { k, st, queue: shuffle(pool).slice(0, st.count), i:0, miss:0, busy:false, hp: st.count };
+  screen = "battle";
+  app.innerHTML = `
+    <div class="bar">
+      <button class="btn" id="toMap">Map</button>
+      <div class="where">${st.name}<br><span style="color:var(--muted)">${st.zh}</span></div>
+      <div class="count" id="count"></div>
+    </div>
+    <div class="arena">
+      ${HERO}
+      <div class="foe" id="foe"><div class="hp"><i id="hpFill" style="width:100%"></i></div>${monsterSVG(st)}</div>
+      <div class="pow" id="pow">HIT!</div>
+    </div>
+    <div class="meaning" id="meaning"></div>
+    <div class="clue">
+      <button class="play" id="play">${PLAY_ICON}Play</button>
+      <label class="speed" for="rate">Speed
+        <input type="range" id="rate" min="0.3" max="1.2" step="0.05" value="${save.rate}">
+        <output id="rateOut">${save.rate.toFixed(2)}x</output>
+      </label>
+      <label class="voice" for="voiceSel">Voice <select id="voiceSel" class="voice-sel"></select></label>
+    </div>
+    <div class="wordwrap">
+      <div class="word" id="word"></div>
+      <input id="typer" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" aria-label="Type the word">
+    </div>
+    <div class="tap" id="tap">Tap the boxes to type</div>
+    <div class="msg" id="msg"></div>`;
+  document.getElementById("toMap").onclick = () => { if (hasTTS) speechSynthesis.cancel(); showMap(); };
+  document.getElementById("play").onclick = () => speak(G.cur.word);
+  fillVoiceSelects(); bindVoiceSelect(document.getElementById("voiceSel"));
+  const rate = document.getElementById("rate"), rateOut = document.getElementById("rateOut");
+  rate.oninput = () => { save.rate = +rate.value; rateOut.textContent = save.rate.toFixed(2) + "x"; };
+  rate.onchange = () => { persist(); speak(G.cur.word); };
+  const typer = document.getElementById("typer"), tap = document.getElementById("tap");
+  typer.addEventListener("input", () => {
+    const v = typer.value; typer.value = "";
+    for (const ch of v) { if (/[a-z]/i.test(ch)) press(ch); else if (ch === " ") speak(G.cur.word); }
+  });
+  typer.addEventListener("focus", () => tap.hidden = true);
+  typer.addEventListener("blur", () => tap.hidden = false);
+  nextWord();
+}
+
+function nextWord(){
+  const w = G.cur = G.queue[G.i];
+  G.letters = []; w.syl.forEach((s, si) => [...s].forEach(ch => G.letters.push({ ch, si, ghost: false })));
+  G.pos = 0; G.missHere = 0; G.busy = false;
+  document.getElementById("count").textContent = (G.i+1) + " / " + G.queue.length;
+  document.getElementById("meaning").innerHTML = `
+    <div class="m-row"><span class="tag">中文</span><span class="zh-t" lang="zh-Hans">${zhRuby(w.zh)}</span><button class="say" id="sayZh" aria-label="Play Chinese">${SPEAKER}</button></div>
+    <div class="m-row"><span class="tag">日本語</span><span class="ja-t" lang="ja">${ruby(w.ja)}</span><button class="say" id="sayJa" aria-label="Play Japanese">${SPEAKER}</button></div>
+    <div class="parts">${w.syl.length} part${w.syl.length>1?"s":""}</div>`;
+  document.getElementById("sayZh").onclick = () => speakLang(w.zh.replace("／","，"), "zh-CN");
+  document.getElementById("sayJa").onclick = () => speakLang(w.ja.replace(/\[([^|\]]+)\|([^\]]+)\]/g, "$2"), "ja-JP");
+  try { document.getElementById("typer").focus({ preventScroll:true }); } catch(e){}
+  const msg = document.getElementById("msg"); msg.textContent = ""; msg.className = "msg";
+  // syllable boxes, one colour each
+  let n = 0;
+  document.getElementById("word").innerHTML = w.syl.map((s, si) =>
+    `<div class="syl" style="--c:${SYL_COLORS[si % SYL_COLORS.length]}">${[...s].map(() => `<span class="slot" data-n="${n++}"></span>`).join("")}</div>`).join("");
+  G.slots = [...document.querySelectorAll(".slot")];
+  G.letters.forEach((L, idx) => paint(idx));
+  setTimeout(() => speak(w.word), 300);
+}
+
+function paint(idx){
+  const L = G.letters[idx], el = G.slots[idx];
+  el.className = "slot";
+  if (idx < G.pos) { el.textContent = L.ch; }
+  else if (L.ghost) { el.textContent = L.ch; el.classList.add("ghost"); }
+  else el.textContent = "";
+  if (idx === G.pos) el.classList.add("cur");
+}
+
+function press(ch, keyEl){
+  if (screen !== "battle" || !G || G.busy) return;
+  ch = ch.toLowerCase();
+  keyEl = keyEl || document.querySelector(`.key[data-ch="${ch}"]`);
+  const need = G.letters[G.pos].ch;
+  if (ch === need){
+    sfx.ok(); flashKey(keyEl, "good");
+    G.pos++; G.missHere = 0;
+    paint(G.pos - 1); if (G.pos < G.letters.length) paint(G.pos);
+    if (G.pos === G.letters.length) wordDone();
+  } else {
+    sfx.bad(); flashKey(keyEl, "bad");
+    G.miss++; G.missHere++;
+    const el = G.slots[G.pos]; el.classList.remove("bad"); void el.offsetWidth; el.classList.add("bad");
+    const msg = document.getElementById("msg"); msg.className = "msg warn";
+    if (G.missHere % 3 === 0){ speak(G.cur.word, Math.max(0.3, save.rate - 0.2)); msg.textContent = "Listen again"; }
+    else msg.textContent = "Try again";
+  }
+}
+function flashKey(el, cls){ if (!el) return; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 260); }
+
+function hint(){
+  if (!G || G.busy) return;
+  speak(G.cur.word, 0.45);
+  const L = G.letters[G.pos];
+  if (!L.ghost){ L.ghost = true; G.miss++; paint(G.pos); }
+}
+
+function wordDone(){
+  G.busy = true;
+  const msg = document.getElementById("msg"); msg.className = "msg";
+  msg.textContent = ["Great!","Super!","Well done!","Brilliant!","Excellent!"][Math.floor(Math.random()*5)];
+  setTimeout(() => speak(G.cur.word, 0.75), 150);
+  const hero = document.getElementById("hero"), foe = document.getElementById("foe"), pow = document.getElementById("pow");
+  hero.classList.add("attack");
+  setTimeout(() => {
+    hero.classList.remove("attack"); sfx.hit();
+    foe.classList.remove("hit"); void foe.offsetWidth; foe.classList.add("hit");
+    pow.classList.remove("show"); void pow.offsetWidth; pow.classList.add("show");
+    G.hp--; document.getElementById("hpFill").style.width = (G.hp / G.queue.length * 100) + "%";
+  }, 200);
+  G.i++;
+  setTimeout(() => {
+    if (G.i >= G.queue.length){ foe.classList.add("dead"); setTimeout(stageClear, 900); }
+    else nextWord();
+  }, 1600);
+}
+
+function stageClear(){
+  const st = G.st, stars = G.miss <= 2 ? 3 : G.miss <= 6 ? 2 : 1;
+  save.stars[st.key] = Math.max(save.stars[st.key]||0, stars);
+  if (G.k + 1 < STAGES.length) save.unlocked = Math.max(save.unlocked, G.k + 2);
+  persist(); sfx.win();
+  const isLast = G.k === STAGES.length - 1;
+  modal.innerHTML = `
+    <h2>${isLast ? "THE DRAGON IS DEFEATED!" : "STAGE CLEAR!"}</h2>
+    ${starRow(stars, "big-stars")}
+    <p>${G.miss === 0 ? "No mistakes. Amazing!" : G.miss + " mistake" + (G.miss>1?"s":"") + ". Keep practising!"}</p>
+    <div class="learned">${G.queue.map(w=>`<span>${w.word}</span>`).join("")}</div>
+    <div class="row">
+      <button class="btn" id="mMap">Map</button>
+      <button class="btn" id="mAgain">Play again</button>
+      ${isLast ? "" : '<button class="btn primary" id="mNext">Next</button>'}
+    </div>`;
+  overlay.hidden = false; screen = "clear";
+  document.getElementById("mMap").onclick = showMap;
+  document.getElementById("mAgain").onclick = () => { overlay.hidden = true; startStage(G.k); };
+  const nx = document.getElementById("mNext"); if (nx) { nx.onclick = () => { overlay.hidden = true; startStage(G.k + 1); }; nx.focus(); }
+}
+
+/* ---------- PHYSICAL KEYBOARD ---------- */
+document.addEventListener("keydown", e => {
+  if (screen !== "battle" || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.id === "typer") { if (e.key === "Enter") speak(G.cur.word); return; }
+  if (e.target.id === "rate") return;
+  if (/^[a-z]$/i.test(e.key)) { e.preventDefault(); press(e.key); }
+  else if (e.key === " " || e.key === "Enter") { if (e.target.tagName !== "BUTTON") { e.preventDefault(); speak(G.cur.word); } }
+});
+
+showMap();
+</script>
